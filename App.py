@@ -22,6 +22,18 @@ st.markdown("""
     h1, h2, h3, p, label, .stMarkdown { text-align: right; direction: rtl; }
     .stTextInput input { direction: rtl; text-align: right; }
     div[data-testid="stFileUploader"] { direction: rtl; }
+    
+    /* تنسيق عبارة الإعداد أسفل التطبيق */
+    .footer-credit {
+        text-align: center;
+        padding: 20px 0 10px 0;
+        margin-top: 40px;
+        border-top: 2px solid #1e3a8a;
+        color: #1e3a8a;
+        font-size: 16px;
+        font-weight: bold;
+        direction: rtl;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -30,7 +42,6 @@ st.markdown("---")
 
 # ===== دوال مساعدة =====
 def save_uploaded_image(uploaded_file, filename):
-    """يحفظ الصورة المرفوعة ويعيد مسارها"""
     if uploaded_file is None:
         return None
     img = Image.open(uploaded_file)
@@ -42,7 +53,6 @@ def save_uploaded_image(uploaded_file, filename):
     return path
 
 def add_image_to_doc(doc, img_path, caption, width=Inches(4.5)):
-    """يضيف صورة إلى مستند Word"""
     if img_path and os.path.exists(img_path):
         p = doc.add_paragraph()
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -62,19 +72,16 @@ with st.form("student_form"):
     
     st.subheader("📝 البيانات الشخصية")
     
-    # الاسم الثلاثي (سطر كامل)
     full_name = st.text_input(
         "الاسم الثلاثي *",
         placeholder="مثال: أحمد محمد علي"
     )
     
-    # اسم الأم وكنيتها (سطر كامل)
     mother_full = st.text_input(
         "اسم الأم وكنيتها *",
         placeholder="مثال: فاطمة الحلبي"
     )
     
-    # الصف الأول: السنة الحالية + الرقم الجامعي
     col1, col2 = st.columns(2)
     with col1:
         current_year = st.selectbox(
@@ -88,7 +95,6 @@ with st.form("student_form"):
             placeholder="مثال: 2024001"
         )
     
-    # الصف الثاني: رقم الهاتف + الرقم الوطني
     col1, col2 = st.columns(2)
     with col1:
         phone = st.text_input(
@@ -101,7 +107,6 @@ with st.form("student_form"):
             placeholder="مثال: 01234567890"
         )
     
-    # الصف الثالث: رقم الاكتتاب + دورة الشهادة
     col1, col2 = st.columns(2)
     with col1:
         cert_number = st.text_input(
@@ -139,7 +144,6 @@ with st.form("student_form"):
 
 # ===== عند الإرسال =====
 if submitted:
-    # التحقق من الحقول
     errors = []
     if not full_name: errors.append("الاسم الثلاثي")
     if not mother_full: errors.append("اسم الأم وكنيتها")
@@ -154,7 +158,6 @@ if submitted:
     else:
         with st.spinner("⏳ جاري إنشاء الملف..."):
             
-            # حفظ الصور مؤقتاً
             images = {
                 "id_front": save_uploaded_image(id_front, "id_front.jpg"),
                 "id_back": save_uploaded_image(id_back, "id_back.jpg"),
@@ -163,10 +166,8 @@ if submitted:
                 "cert": save_uploaded_image(cert_image, "cert.jpg"),
             }
             
-            # إنشاء المستند
             doc = Document()
             
-            # تنسيق عام
             style = doc.styles['Normal']
             style.font.name = 'Arial'
             style.font.size = Pt(12)
@@ -209,36 +210,38 @@ if submitted:
             doc.add_page_break()
             doc.add_heading('📎 المستندات المرفقة', level=1)
             
-            # الهوية
             doc.add_heading('🪪 الهوية', level=2)
             add_image_to_doc(doc, images["id_front"], "الوجه الأمامي")
             add_image_to_doc(doc, images["id_back"], "الوجه الخلفي")
             
-            # البطاقة الجامعية
             doc.add_heading('🎓 البطاقة الجامعية', level=2)
             add_image_to_doc(doc, images["card_front"], "الوجه الأمامي")
             add_image_to_doc(doc, images["card_back"], "الوجه الخلفي")
             
-            # الشهادة الثانوية
             doc.add_heading('📜 الشهادة الثانوية', level=2)
             add_image_to_doc(doc, images["cert"], "الشهادة الثانوية")
             
-            # حفظ في الذاكرة
             buffer = io.BytesIO()
             doc.save(buffer)
             buffer.seek(0)
             
             st.success("✅ تم إنشاء الملف بنجاح!")
             
-            # اسم الملف
             safe_name = full_name.replace(" ", "_")
             file_name = f"{safe_name}_{university_id}_{datetime.now().strftime('%Y%m%d')}.docx"
             
-            # زر التحميل
             st.download_button(
                 label="⬇️ تحميل ملف Word",
                 data=buffer,
                 file_name=file_name,
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 use_container_width=True
-    )
+            )
+
+# ═══════════════════════════════════════════════
+# ⭐ عبارة "إعداد الطالب: توفيق قدوري" - في التطبيق فقط
+# ═══════════════════════════════════════════════
+st.markdown(
+    '<div class="footer-credit">✍️ إعداد الطالب: توفيق قدوري</div>',
+    unsafe_allow_html=True
+)
