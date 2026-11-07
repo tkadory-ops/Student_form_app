@@ -5,6 +5,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_ALIGN_VERTICAL
 from PIL import Image
 import io
+import os
 from datetime import datetime
 
 # ===== إعداد الصفحة =====
@@ -33,7 +34,8 @@ def save_uploaded_image(uploaded_file, filename):
     if uploaded_file is None:
         return None
     img = Image.open(uploaded_file)
-    # ضغط الصورة لتقليل الحجم
+    if img.mode in ("RGBA", "P"):
+        img = img.convert("RGB")
     img.thumbnail((1500, 1500))
     path = f"/tmp/{filename}"
     img.save(path, "JPEG", quality=85)
@@ -41,15 +43,16 @@ def save_uploaded_image(uploaded_file, filename):
 
 def add_image_to_doc(doc, img_path, caption, width=Inches(4.5)):
     """يضيف صورة إلى مستند Word"""
-    if img_path:
-        st_img = doc.add_paragraph()
-        st_img.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        st_img.add_run().add_picture(img_path, width=width)
+    if img_path and os.path.exists(img_path):
+        p = doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.add_run().add_picture(img_path, width=width)
         
         cap = doc.add_paragraph(caption)
         cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        cap.runs[0].font.size = Pt(10)
-        cap.runs[0].font.italic = True
+        if cap.runs:
+            cap.runs[0].font.size = Pt(10)
+            cap.runs[0].font.italic = True
     else:
         p = doc.add_paragraph(f"⚠️ {caption}: غير مرفقة")
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -59,17 +62,57 @@ with st.form("student_form"):
     
     st.subheader("📝 البيانات الشخصية")
     
+    # الاسم الثلاثي (سطر كامل)
+    full_name = st.text_input(
+        "الاسم الثلاثي *",
+        placeholder="مثال: أحمد محمد علي"
+    )
+    
+    # اسم الأم وكنيتها (سطر كامل)
+    mother_full = st.text_input(
+        "اسم الأم وكنيتها *",
+        placeholder="مثال: فاطمة الحلبي"
+    )
+    
+    # الصف الأول: السنة الحالية + الرقم الجامعي
     col1, col2 = st.columns(2)
     with col1:
-        national_id = st.text_input("الرقم الوطني *", placeholder="مثال: 01234567890")
-        university_id = st.text_input("الرقم الجامعي *", placeholder="مثال: 2024001")
-        phone = st.text_input("رقم هاتف للتواصل *", placeholder="مثال: 0912345678")
+        current_year = st.selectbox(
+            "السنة الحالية للطالب *",
+            ["السنة الأولى", "السنة الثانية", "السنة الثالثة",
+             "السنة الرابعة", "السنة الخامسة", "السنة السادسة"]
+        )
     with col2:
-        mother_name = st.text_input("كنية الأم *", placeholder="مثال: فاطمة")
-        cert_number = st.text_input("رقم اكتتاب الشهادة الثانوية *", placeholder="مثال: 123456")
-        year = st.selectbox("سنة الطالب الحالية *", 
-                            ["السنة الأولى", "السنة الثانية", "السنة الثالثة",
-                             "السنة الرابعة", "السنة الخامسة", "السنة السادسة"])
+        university_id = st.text_input(
+            "الرقم الجامعي *",
+            placeholder="مثال: 2024001"
+        )
+    
+    # الصف الثاني: رقم الهاتف + الرقم الوطني
+    col1, col2 = st.columns(2)
+    with col1:
+        phone = st.text_input(
+            "رقم الهاتف *",
+            placeholder="مثال: 0912345678"
+        )
+    with col2:
+        national_id = st.text_input(
+            "الرقم الوطني *",
+            placeholder="مثال: 01234567890"
+        )
+    
+    # الصف الثالث: رقم الاكتتاب + دورة الشهادة
+    col1, col2 = st.columns(2)
+    with col1:
+        cert_number = st.text_input(
+            "رقم اكتتاب الشهادة الثانوية *",
+            placeholder="مثال: 123456"
+        )
+    with col2:
+        cert_year = st.text_input(
+            "دورة الشهادة الثانوية *",
+            placeholder="مثال: 2023"
+        )
     
     st.markdown("---")
     st.subheader("🖼️ الصور المطلوبة")
@@ -96,13 +139,15 @@ with st.form("student_form"):
 
 # ===== عند الإرسال =====
 if submitted:
-    # التحقق
+    # التحقق من الحقول
     errors = []
-    if not national_id: errors.append("الرقم الوطني")
+    if not full_name: errors.append("الاسم الثلاثي")
+    if not mother_full: errors.append("اسم الأم وكنيتها")
     if not university_id: errors.append("الرقم الجامعي")
     if not phone: errors.append("رقم الهاتف")
-    if not mother_name: errors.append("كنية الأم")
+    if not national_id: errors.append("الرقم الوطني")
     if not cert_number: errors.append("رقم اكتتاب الشهادة")
+    if not cert_year: errors.append("دورة الشهادة الثانوية")
     
     if errors:
         st.error(f"❌ الرجاء تعبئة الحقول التالية: {', '.join(errors)}")
@@ -131,22 +176,25 @@ if submitted:
             h.alignment = WD_ALIGN_PARAGRAPH.CENTER
             h.runs[0].font.color.rgb = RGBColor(0x1e, 0x3a, 0x8a)
             
+            # التاريخ
             date_p = doc.add_paragraph(f"تاريخ التحرير: {datetime.now().strftime('%Y/%m/%d')}")
             date_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
             
             doc.add_paragraph()
             
-            # جدول البيانات
-            table = doc.add_table(rows=6, cols=2)
+            # جدول البيانات (8 صفوف)
+            table = doc.add_table(rows=8, cols=2)
             table.style = 'Light Grid Accent 1'
             
             rows_data = [
-                ("الرقم الوطني", national_id),
-                ("كنية الأم", mother_name),
+                ("الاسم الثلاثي", full_name),
+                ("اسم الأم وكنيتها", mother_full),
+                ("السنة الحالية للطالب", current_year),
                 ("الرقم الجامعي", university_id),
+                ("رقم الهاتف", phone),
+                ("الرقم الوطني", national_id),
                 ("رقم اكتتاب الشهادة الثانوية", cert_number),
-                ("رقم هاتف للتواصل", phone),
-                ("سنة الطالب الحالية", year),
+                ("دورة الشهادة الثانوية", cert_year),
             ]
             
             for i, (label, value) in enumerate(rows_data):
@@ -171,7 +219,7 @@ if submitted:
             add_image_to_doc(doc, images["card_front"], "الوجه الأمامي")
             add_image_to_doc(doc, images["card_back"], "الوجه الخلفي")
             
-            # الشهادة
+            # الشهادة الثانوية
             doc.add_heading('📜 الشهادة الثانوية', level=2)
             add_image_to_doc(doc, images["cert"], "الشهادة الثانوية")
             
@@ -182,11 +230,15 @@ if submitted:
             
             st.success("✅ تم إنشاء الملف بنجاح!")
             
+            # اسم الملف
+            safe_name = full_name.replace(" ", "_")
+            file_name = f"{safe_name}_{university_id}_{datetime.now().strftime('%Y%m%d')}.docx"
+            
             # زر التحميل
             st.download_button(
                 label="⬇️ تحميل ملف Word",
                 data=buffer,
-                file_name=f"طالب_{university_id}_{datetime.now().strftime('%Y%m%d')}.docx",
+                file_name=file_name,
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 use_container_width=True
-            )
+    )
